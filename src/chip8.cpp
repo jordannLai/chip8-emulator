@@ -224,6 +224,72 @@ void Chip8::execute(uint16_t opcode)
         V_[x] += nn;
         break;
 
+    case 0x8000:
+        switch (n)
+        {
+        case 0x0:
+            // 8XY0: set VX = VY
+            V_[x] = V_[y];
+            break;
+        case 0x1:
+            // 8XY1: set VX = VX | VY
+            V_[x] |= V_[y];
+            V_[0xF] = 0;
+            break;
+        case 0x2:
+            // 8XY2: set VX = VX & VY
+            V_[x] &= V_[y];
+            V_[0xF] = 0;
+            break;
+        case 0x3:
+            // 8XY3: set VX = VX ^ VY
+            V_[x] ^= V_[y];
+            V_[0xF] = 0;
+            break;
+        case 0x4:
+        {
+            // 8XY4: VX = VX + VY, VF = 1 if the result overflowed 255
+            int sum = V_[x] + V_[y]; // int, so it can hold more than 255
+            uint8_t flag = (sum > 255) ? 1 : 0;
+            V_[x] = sum & 0xFF; // keep only the low 8 bits
+            V_[0xF] = flag;     // set VF LAST
+            break;
+        }
+        case 0x5:
+        {
+            uint8_t flag = (V_[x] >= V_[y]) ? 1 : 0;
+            V_[x] = V_[x] - V_[y];
+            V_[0xF] = flag;
+            break;
+        }
+        case 0x6:
+        {
+            uint8_t flag = V_[y] & 0x01;
+            V_[x] = V_[y] >> 1;
+            V_[0xF] = flag;
+            break;
+        }
+        case 0x7:
+        {
+            uint8_t flag = (V_[y] >= V_[x]) ? 1 : 0;
+            V_[x] = V_[y] - V_[x];
+            V_[0xF] = flag;
+            break;
+        }
+        case 0xE: // 8XYE: VX = VY << 1, VF = bit shifted out
+        {
+            uint8_t flag = (V_[y] >> 7) & 0x01;
+            V_[x] = V_[y] << 1;
+            V_[0xF] = flag;
+            break;
+        }
+
+        default:
+            std::fprintf(stderr, "Unknown opcode: %04X at %03X\n", opcode, pc_ - 2);
+            break;
+        }
+        break;
+
     case 0x9000:
         // 9XY0: skip the next instruction if VX != VY
         if (V_[x] != V_[y])
