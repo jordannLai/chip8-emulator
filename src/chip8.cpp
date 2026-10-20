@@ -202,28 +202,41 @@ void Chip8::execute(uint16_t opcode)
         I_ = nnn;
         break;
 
-        // ---------------------------------------------------------------
-        // YOUR TURN. Milestone 1 (the IBM logo test) needs just four more:
-        //
-        //   6XNN  set VX = NN
-        //   7XNN  add NN to VX (no carry flag)
-        //   ANNN  set I = NNN
-        //   DXYN  draw an N-row sprite from memory[I] at (VX, VY).
-        //         Each row is one byte; each bit is one pixel.
-        //         XOR each pixel onto display_. If any pixel goes from on
-        //         to off, set VF = 1 (a "collision"), otherwise VF = 0.
-        //         Start position wraps around the screen; pixels past the
-        //         edge are clipped.
-        //
-        // Milestone 2 (the rest):
-        //   2NNN call subroutine     3XNN skip if VX == NN
-        //   4XNN skip if VX != NN    5XY0 skip if VX == VY
-        //   8XY0-8XYE arithmetic and logic (9 instructions, VF flags!)
-        //   9XY0 skip if VX != VY    BNNN jump to NNN + V0
-        //   CXNN VX = random & NN    EX9E / EXA1 skip on key state
-        //   FX07 FX0A FX15 FX18 FX1E FX29 FX33 FX55 FX65 (timers, keys,
-        //        font, decimal digits, saving and loading registers)
-        // ---------------------------------------------------------------
+    case 0xD000:
+    {
+        // Starting position wraps around the screen
+        int start_x = V_[x] % kWidth;
+        int start_y = V_[y] % kHeight;
+
+        V_[0xF] = 0; // no collision yet
+
+        for (int row = 0; row < n; ++row)
+        {
+            int py = start_y + row;
+            if (py >= kHeight)
+                break; // clip at the bottom edge
+
+            uint8_t sprite_byte = memory_[I_ + row]; // read row "row" of the sprite from memory, starting at I_
+
+            for (int col = 0; col < 8; ++col)
+            {
+                int px = start_x + col;
+                if (px >= kWidth)
+                    break; // clip at the right edge
+
+                bool bit_on = sprite_byte & (0x80 >> col); // check bits left to right
+                if (!bit_on)
+                    continue;
+
+                uint8_t &pixel = display_[py * kWidth + px]; // index into the flat screen array: row py, column px
+
+                if (pixel == 1)
+                    V_[0xF] = 1; // turning a lit pixel off is a collision
+                pixel ^= 1;      // flip the pixel
+            }
+        }
+        break;
+    }
 
     default:
         std::fprintf(stderr, "Unknown opcode: %04X at %03X\n", opcode, pc_ - 2);
