@@ -160,12 +160,6 @@ void Chip8::execute(uint16_t opcode)
     const uint8_t nn = opcode & 0x00FF;     // second byte: an 8-bit number
     const uint16_t nnn = opcode & 0x0FFF;   // last 12 bits: a memory address
 
-    // Silence "unused variable" warnings until you use them.
-    (void)x;
-    (void)y;
-    (void)n;
-    (void)nn;
-
     // The first nibble says which kind of instruction this is.
     switch (opcode & 0xF000)
     {
@@ -177,14 +171,47 @@ void Chip8::execute(uint16_t opcode)
         }
         else if (opcode == 0x00EE)
         {
-            // TODO 00EE: return from a subroutine.
-            //   Pop the return address off the stack into pc_.
+            // 00EE: return from a subroutine
+            sp_--;
+            pc_ = stack_[sp_];
         }
+
         break;
 
     case 0x1000:
         // 1NNN: jump to address NNN. (Done for you as an example.)
         pc_ = nnn;
+        break;
+
+    case 0x2000:
+        // 2NNN: call subroutine at NNN
+        stack_[sp_] = pc_;
+        sp_++;
+        pc_ = nnn;
+        break;
+
+    case 0x3000:
+        // 3XNN: skip the next instruction if VX == NN
+        if (V_[x] == nn)
+        {
+            pc_ += 2;
+        }
+        break;
+
+    case 0x4000:
+        // 4XNN: skip the next instruction if VX != NN
+        if (V_[x] != nn)
+        {
+            pc_ += 2;
+        }
+        break;
+
+    case 0x5000:
+        // 5XY0: skip the next instruction if VX == VY
+        if (V_[x] == V_[y])
+        {
+            pc_ += 2;
+        }
         break;
 
     case 0x6000:
@@ -197,6 +224,13 @@ void Chip8::execute(uint16_t opcode)
         V_[x] += nn;
         break;
 
+    case 0x9000:
+        // 9XY0: skip the next instruction if VX != VY
+        if (V_[x] != V_[y])
+        {
+            pc_ += 2;
+        }
+        break;
     case 0xA000:
         // ANNN: set I = NNN.
         I_ = nnn;
