@@ -301,6 +301,17 @@ void Chip8::execute(uint16_t opcode)
         // ANNN: set I = NNN.
         I_ = nnn;
         break;
+    case 0xB000:
+        // BNNN: jump to address NNN + V0
+        pc_ = nnn + V_[0];
+        break;
+
+    case 0xC000:
+    {
+        std::uniform_int_distribution<int> dist(0, 255);
+        V_[x] = dist(rng_) & nn;
+        break;
+    }
 
     case 0xD000:
     {
@@ -337,6 +348,97 @@ void Chip8::execute(uint16_t opcode)
         }
         break;
     }
+    case 0xE000:
+        switch (nn) // EX__ instructions are told apart by the last two digits
+        {
+        case 0x9E: // EX9E: skip next instruction if key with the value of VX is pressed
+            if (keys_[V_[x] & 0xF])
+            {
+                pc_ += 2;
+            }
+            break;
+
+        case 0xA1: // EXA1: skip next instruction if key with the value of VX is not pressed
+            if (!(keys_[V_[x] & 0xF]))
+            {
+                pc_ += 2;
+            }
+            break;
+
+        default:
+            std::fprintf(stderr, "Unknown opcode: %04X at %03X\n", opcode, pc_ - 2);
+            break;
+        }
+        break;
+
+    case 0xF000:
+        switch (nn) // FX__ instructions are told apart by the last two digits
+        {
+        case 0x07: // FX07: VX = delay timer
+            V_[x] = delay_timer_;
+            break;
+
+        case 0x0A: // FX0A: wait for a key press, store it in VX
+        {
+            bool found = false;
+            for (int key = 0; key < 16; ++key)
+            {
+                if (keys_[key])
+                {
+                    V_[x] = key;
+                    found = true;
+                    break; // exits the for loop only, not the switch
+                }
+            }
+            if (!found)
+            {
+                pc_ -= 2; // no key yet: rewind so this instruction runs again
+            }
+            break;
+        }
+        case 0x15: // FX15: delay timer = VX
+            delay_timer_ = V_[x];
+            break;
+
+        case 0x18: // FX18: sound timer = VX
+            sound_timer_ = V_[x];
+            break;
+
+        case 0x1E: // FX1E: I += VX
+            I_ += V_[x];
+            break;
+
+        case 0x29: // FX29: I = address of the font character for digit VX
+            I_ = kFontAddress + (V_[x] & 0xF) * 5;
+            break;
+
+        case 0x33:                               // FX33: store VX as 3 decimal digits at I, I+1, I+2
+            memory_[I_] = V_[x] / 100;           // hundreds
+            memory_[I_ + 1] = (V_[x] / 10) % 10; // tens
+            memory_[I_ + 2] = V_[x] % 10;        // ones
+            break;
+
+        case 0x55: // FX55: store V0..VX in memory starting at I, then I += x + 1
+            for (int i = 0; i <= x; ++i)
+            {
+                memory_[I_ + i] = V_[i];
+            }
+            I_ += x + 1; // original CHIP-8 leaves I pointing just past the data
+            break;
+
+        case 0x65: // FX65: load V0..VX from memory starting at I, then I += x + 1
+            for (int i = 0; i <= x; ++i)
+            {
+                V_[i] = memory_[I_ + i];
+            }
+            I_ += x + 1;
+            break;
+
+        default:
+            std::fprintf(stderr, "Unknown opcode: %04X at %03X\n", opcode, pc_ - 2);
+            break;
+        }
+        break; // ends case 0xF000
 
     default:
         std::fprintf(stderr, "Unknown opcode: %04X at %03X\n", opcode, pc_ - 2);
